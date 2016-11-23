@@ -444,6 +444,7 @@ public:
 	void setCache(unsigned num_sets,
 			unsigned num_ways,
 			unsigned block_size,
+		        unsigned RRPV_max_value,
 			Cache::ReplacementPolicy replacement_policy,
 			Cache::WritePolicy write_policy)
 	{
@@ -452,6 +453,7 @@ public:
 				num_sets,
 				num_ways,
 				block_size,
+				RRPV_max_value,
 				replacement_policy,
 				write_policy);
 	}
@@ -614,7 +616,7 @@ public:
 
 	/// Return the number of sharers for the given directory entry. A
 	/// directory must have been created for this module.
-	int getNumSharers(int set_id, int way_id, int sub_block_id)
+	int getNumSharers(int set_id, int way_id, int sub_block_id) const
 	{
 		assert(directory.get());
 		Directory::Entry *entry = directory->getEntry(set_id, way_id,
@@ -688,6 +690,9 @@ public:
 
 	/// Dump the module information.
 	void Dump(std::ostream &os = std::cout) const;
+
+	/// Dump the module report.
+	void DumpReport(std::ostream &os = std::cout) const;
 
 	/// Check if an access to a module can be coalesced with another access
 	/// older than 'older_than_frame'. If 'older_than_frame' is nullptr,

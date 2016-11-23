@@ -25,9 +25,8 @@
 #include <lib/cpp/List.h>
 #include <lib/cpp/String.h>
 
-const int initialRRPV = 2;
-const int minRRPV = 0;
-const int maxRRPV = 3;
+	/// Near immediate re-referenced interval
+	const unsigned RRPV_min_value = 0;
 
 namespace mem
 {
@@ -91,8 +90,8 @@ public:
 		// Way identifier
 		unsigned way_id = 0;
 
-			// RRPV value, initially 2
-			unsigned rrpv = initialRRPV;
+			// RRPV value, initially 0, optional
+			unsigned rrpv = 0;
 
 		// Block state
 		BlockState state = BlockInvalid;
@@ -125,6 +124,7 @@ public:
 			this->state = state;
 			this->tag = tag;
 		}
+
 	};
 
 private:
@@ -159,6 +159,9 @@ private:
 	// Log base 2 of the block size
 	int log_block_size;
 
+		// RRPV maximum value per cache block
+		unsigned RRPV_max_value;
+	
 	// Block replacement policy
 	ReplacementPolicy replacement_policy;
 
@@ -180,11 +183,12 @@ private:
 
 public:
 
-	/// Constructor
+	/// Constructor, add RRPV maximum value as a parameter
 	Cache(const std::string &name,
 			unsigned num_sets,
 			unsigned num_ways,
 			unsigned block_size,
+	                unsigned RRPV_max_value,
 			ReplacementPolicy replacement_policy,
 			WritePolicy write_policy);
 	

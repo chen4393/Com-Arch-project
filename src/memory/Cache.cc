@@ -29,7 +29,7 @@ const misc::StringMap Cache::ReplacementPolicyMap =
 	{ "LRU", ReplacementLRU },
 	{ "FIFO", ReplacementFIFO },
 	{ "Random", ReplacementRandom },
-		{ "SRRIP", ReplacementSRRIP }
+        	{ "SRRIP", ReplacementSRRIP }
 };
 
 
@@ -52,18 +52,20 @@ const misc::StringMap Cache::BlockStateMap =
 
 
 Cache::Cache(const std::string &name,
-		unsigned num_sets,
-		unsigned num_ways,
-		unsigned block_size,
-		ReplacementPolicy replacement_policy,
-		WritePolicy write_policy)
-		:
-		name(name),
-		num_sets(num_sets),
-		num_ways(num_ways),
-		block_size(block_size),
-		replacement_policy(replacement_policy),
-		write_policy(write_policy)
+	     unsigned num_sets,
+	     unsigned num_ways,
+	     unsigned block_size,
+	     unsigned RRPV_max_value,
+	     ReplacementPolicy replacement_policy,
+	     WritePolicy write_policy)
+	     :
+	     name(name),
+	     num_sets(num_sets),
+	     num_ways(num_ways),
+	     block_size(block_size),
+	     RRPV_max_value(RRPV_max_value),
+	     replacement_policy(replacement_policy),
+	     write_policy(write_policy)
 {
 	// Derived fields
 	assert(!(num_sets & (num_sets - 1)));
@@ -86,6 +88,12 @@ Cache::Cache(const std::string &name,
 			Block *block = getBlock(set_id, way_id);
 			block->way_id = way_id;
 			set->lru_list.PushBack(block->lru_node);
+			
+				// Initialize RRPV for each block, 2^M - 1 initially
+				if (replacement_policy == ReplacementSRRIP)
+				{
+					block->rrpv = RRPV_max_value;
+				}
 		}
 	}
 }
@@ -155,6 +163,12 @@ void Cache::setBlock(unsigned set_id,
 		set->lru_list.Erase(block->lru_node);
 		set->lru_list.PushFront(block->lru_node);
 	}
+	
+		//Upon insertion, blocks are given a long rereference prediction value, i.e. 2^M - 2
+		if (replacement_policy == ReplacementSRRIP)
+		{
+			block->rrpv = RRPV_max_value - 1;
+		}	
 
 	// Set new values for block
 	block->tag = tag;
@@ -192,10 +206,12 @@ void Cache::AccessBlock(unsigned set_id, unsigned way_id)
 		set->lru_list.Erase(block->lru_node);
 		set->lru_list.PushFront(block->lru_node);
 	}
-	
-		// The RRPV is set to '0' when cache hit for SRRIP policy
-		if (replacement_policy == ReplacementSRRIP)
-			block->rrpv = minRRPV;
+
+		//Set the RRPV to '0' on block reference if cache hit, i.e. near-immediate value
+        	if (replacement_policy == ReplacementSRRIP)
+        	{
+                	block->rrpv = RRPV_min_value;
+        	}
 }
 
 
@@ -221,30 +237,30 @@ unsigned Cache::ReplaceBlock(unsigned set_id)
 		// Return way index of the selected block
 		return block->way_id;
 	}
-		
-		// SRRIP replacement policy 
-		if (replacement_policy == ReplacementSRRIP)
+	
+		//If replacement policy is SWLTP, return the way ID
+		if(replacement_policy == ReplacementSRRIP)
 		{
-			while (true)
+			//Perform RRIP RRPV check and update
+			while(true)
 			{
-				// Search for first '3' from left
-				for (unsigned way_id = 0; way_id < num_ways; way_id++)
+				//Look for blocks in the set that have a maximum RRPV value
+				for(unsigned way_id = 0; way_id < num_ways; way_id++)
 				{
-					Block* block = getBlock(set_id, way_id);
-					if (block->rrpv == maxRRPV)	// If '3' is found, replace block and set RRPV to '2'
+					Block *block = getBlock(set_id, way_id);
+					if(block->rrpv == RRPV_max_value)
 					{
-						block->rrpv = initialRRPV;
+						block->rrpv = RRPV_max_value - 1;
 						return way_id;
 					}
 				}
-				// If not, increment all RRPVs
-				for (unsigned way_id = 0; way_id < num_ways; way_id++)
+
+				//If none are found, increment every blocks RRPV value
+				for(unsigned way_id = 0; way_id < num_ways; way_id++)
 				{
-					Block* block = getBlock(set_id, way_id);
-					if (block->rrpv < maxRRPV)
-					{ 
-						block->rrpv++;
-					}
+					Block *block = getBlock(set_id, way_id);
+					block->rrpv = (block->rrpv == RRPV_max_value) ?
+						RRPV_max_value : (block->rrpv + 1);
 				}
 			}
 		}
